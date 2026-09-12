@@ -6,10 +6,17 @@ import axios from 'axios'
  * so we can use relative paths in dev and absolute in production.
  *
  * Set VITE_API_URL in Cloudflare Pages env vars for production.
+ * Set VITE_API_KEY to the same value as the backend API_KEY so every
+ * request carries the X-Api-Key header.
  */
+const apiKey = import.meta.env.VITE_API_KEY
+
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '',
-  headers: { 'Content-Type': 'application/json' },
+  headers: {
+    'Content-Type': 'application/json',
+    ...(apiKey ? { 'X-Api-Key': apiKey } : {}),
+  },
   timeout: 15000,
 })
 

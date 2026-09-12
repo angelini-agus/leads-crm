@@ -1,11 +1,59 @@
+# ── Entorno / secretos ────────────────────────────────────────────────────────
+# Nunca commitear valores reales. Los .example sí se versionan.
+.env
+.env.*
+!.env.example
+
+# ── Node / frontend ───────────────────────────────────────────────────────────
 node_modules/
 dist/
-.env
-.env.local
-*.user
-.vs/
+dist-ssr/
+.vite/
+*.local
+
+# Logs de npm/yarn/pnpm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ── .NET / backend ────────────────────────────────────────────────────────────
 bin/
 obj/
+*.user
 *.suo
-*.DS_Store
+*.userosscache
+*.sln.docstates
+.vs/
+
+# Resultados de tests
+TestResults/
+*.trx
+*.coverage
+coverage/
+
+# ── IDE / editores ────────────────────────────────────────────────────────────
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.sw?
+*.ntvs*
+*.njsproj
+
+# ── Sistema operativo ─────────────────────────────────────────────────────────
+.DS_Store
 Thumbs.db
+Desktop.ini
+
+# ── Docker / datos locales ────────────────────────────────────────────────────
+pgdata/
+*.pid
+
+# ── Contexto local de agentes (no compartir) ──────────────────────────────────
+AGENTS.md
+
+# ── Archivos temporales ───────────────────────────────────────────────────────
+*.log
+*.tmp
+*.bak

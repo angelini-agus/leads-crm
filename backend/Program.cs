@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using AutoLeads.Data;
 using AutoLeads.Models;
 using AutoLeads.Services;
@@ -10,6 +11,17 @@ var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
     ?? builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Host=localhost;Port=5433;Database=autoleads;Username=autoleads;Password=autoleads_pass";
 
+// ── API Key for server-to-server auth (required on every /api/* request) ──────
+var apiKey = Environment.GetEnvironmentVariable("API_KEY");
+var apiKeyConfigured = !string.IsNullOrWhiteSpace(apiKey);
+
+// ── CORS allowed origins (comma-separated env var, dev fallback) ──────────────
+var allowedOriginsEnv = Environment.GetEnvironmentVariable("ALLOWED_ORIGINS");
+var allowedOrigins = string.IsNullOrWhiteSpace(allowedOriginsEnv)
+    ? new[] { "http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173" }
+    : allowedOriginsEnv
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
 // ── Dependency Injection ──────────────────────────────────────────────────────
 builder.Services.AddSingleton<IConsultaRepository>(_ => new ConsultaRepository(connectionString));
 builder.Services.AddSingleton<IMasterDataRepository>(_ => new MasterDataRepository(connectionString));
@@ -21,15 +33,10 @@ builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy =>
     {
         policy
-            .WithOrigins(
-                "http://localhost:5173",
-                "http://localhost:3000",
-                "http://127.0.0.1:5173",
-                "https://autoleads-crm.pages.dev"
-            )
+            .WithOrigins(allowedOrigins)
             .SetIsOriginAllowedToAllowWildcardSubdomains()
             .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-            .WithHeaders("Content-Type", "Authorization", "Accept")
+            .WithHeaders("Content-Type", "Authorization", "Accept", "X-Api-Key")
             .WithExposedHeaders("Content-Disposition")
             .AllowCredentials();
     });
@@ -60,7 +67,57 @@ app.UseExceptionHandler(exceptionHandlerApp =>
 
 app.UseCors();
 
-// ── Health check ──────────────────────────────────────────────────────────────
+// ── Startup configuration log (never prints the key value) ────────────────────
+app.Logger.LogInformation(
+    "Configuración de arranque — API_KEY: {ApiKeyState}; ALLOWED_ORIGINS: {AllowedOrigins}",
+    apiKeyConfigured ? "configurada" : "AUSENTE",
+    string.Join(", ", allowedOrigins));
+
+if (!apiKeyConfigured)
+{
+    app.Logger.LogWarning(
+        "API_KEY no configurada. Autenticación deshabilitada en Development; en Production se rechazan las requests a /api/* con 503.");
+}
+
+// ── API Key middleware — /health is public, every /api/* request needs the key ─
+app.Use(async (context, next) =>
+{
+    if (!context.Request.Path.StartsWithSegments("/api"))
+    {
+        await next();
+        return;
+    }
+
+    if (!apiKeyConfigured)
+    {
+        if (app.Environment.IsProduction())
+        {
+            app.Logger.LogError(
+                "API_KEY ausente en Production: rechazando {Method} {Path}.",
+                context.Request.Method, context.Request.Path);
+            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsJsonAsync(new { error = "Servicio no configurado: falta API_KEY." });
+            return;
+        }
+
+        await next();
+        return;
+    }
+
+    var providedKey = context.Request.Headers["X-Api-Key"].ToString();
+    if (string.IsNullOrEmpty(providedKey) || !ApiKeyMatches(providedKey, apiKey!))
+    {
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsJsonAsync(new { error = "API Key inválida o ausente." });
+        return;
+    }
+
+    await next();
+});
+
+// ── Health check (public, used by Docker/nginx) ───────────────────────────────
 app.MapGet("/health", () =>
     Results.Ok(new { status = "ok", timestamp = DateTime.UtcNow }));
 
@@ -283,5 +340,13 @@ app.MapGet("/api/consultas/export", async (
 });
 
 app.Run();
+
+// Constant-time comparison to avoid leaking the key length/content via timing.
+static bool ApiKeyMatches(string provided, string expected)
+{
+    var providedBytes = System.Text.Encoding.UTF8.GetBytes(provided);
+    var expectedBytes = System.Text.Encoding.UTF8.GetBytes(expected);
+    return CryptographicOperations.FixedTimeEquals(providedBytes, expectedBytes);
+}
 
 public partial class Program { }
