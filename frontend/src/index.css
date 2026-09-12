@@ -1234,6 +1234,214 @@ body {
   font-style: italic !important;
 }
 
+/* ── Login ───────────────────────────────────────────────── */
+.login-page {
+  display:    flex;
+  min-height: 100vh;
+}
+
+.login-brand {
+  flex:           0 0 46%;
+  background:     var(--color-sidebar-bg);
+  color:          #FFFFFF;
+  display:        flex;
+  align-items:    center;
+  padding:        48px 56px;
+  position:       relative;
+  overflow:       hidden;
+}
+
+/* Sutil glow rojo de fondo */
+.login-brand::after {
+  content:       '';
+  position:      absolute;
+  right:         -120px;
+  bottom:        -120px;
+  width:         360px;
+  height:        360px;
+  border-radius: 50%;
+  background:    radial-gradient(circle, rgba(229, 57, 53, 0.25), transparent 70%);
+  pointer-events: none;
+}
+
+.login-brand-inner {
+  max-width:  440px;
+  position:   relative;
+  z-index:    1;
+}
+
+.login-logo {
+  display:       flex;
+  align-items:   center;
+  gap:           12px;
+  margin-bottom: 44px;
+}
+
+.login-logo-icon {
+  width:           46px;
+  height:          46px;
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  font-size:       1.9rem;
+}
+
+.login-logo-text {
+  font-size:   1.55rem;
+  font-weight: 800;
+  color:       #FFFFFF;
+  letter-spacing: -0.02em;
+}
+
+.login-logo-text em {
+  color:       var(--color-primary);
+  font-style:  normal;
+}
+
+.login-brand h1 {
+  font-size:      2rem;
+  font-weight:    800;
+  letter-spacing: -0.03em;
+  line-height:    1.15;
+  margin-bottom:  16px;
+}
+
+.login-tagline {
+  color:          var(--color-sidebar-text);
+  font-size:      0.95rem;
+  line-height:    1.65;
+  margin-bottom:  34px;
+}
+
+.login-features {
+  list-style:        none;
+  display:           flex;
+  flex-direction:    column;
+  gap:               14px;
+}
+
+.login-features li {
+  display:      flex;
+  align-items:  center;
+  gap:          12px;
+  color:        #C7C7DB;
+  font-size:    0.9rem;
+}
+
+.login-features li i {
+  color:      var(--color-primary);
+  font-size:  0.85rem;
+}
+
+.login-form-side {
+  flex:            1;
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  padding:         32px;
+  background:      var(--color-body-bg);
+}
+
+.login-card {
+  position:         relative;
+  width:            100%;
+  max-width:        420px;
+  background:       var(--color-white);
+  border-radius:    var(--radius-card);
+  padding:          44px 40px 28px;
+  box-shadow:       0 12px 40px rgba(17, 24, 39, 0.10), 0 2px 8px rgba(17, 24, 39, 0.04);
+  overflow:         hidden;
+}
+
+/* Barra de acento superior */
+.login-card::before {
+  content:    '';
+  position:   absolute;
+  top:        0;
+  left:       0;
+  right:      0;
+  height:     4px;
+  background: linear-gradient(90deg, var(--color-primary), #FF7043);
+}
+
+.login-card-badge {
+  width:           48px;
+  height:          48px;
+  border-radius:   13px;
+  background:      var(--color-primary-light);
+  color:           var(--color-primary);
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  font-size:       1.15rem;
+  margin-bottom:   20px;
+}
+
+.login-card h2 {
+  font-size:      1.4rem;
+  font-weight:    800;
+  letter-spacing: -0.02em;
+  margin-bottom:  6px;
+}
+
+.login-subtitle {
+  color:          var(--color-text-secondary);
+  font-size:      0.9rem;
+  margin-bottom:  28px;
+}
+
+.login-card form {
+  display:        flex;
+  flex-direction: column;
+  gap:            16px;
+}
+
+/* El Password envuelve el input en .p-password (flex) y un .p-icon-field
+   intermedio; hay que forzar el ancho en ambos para que iguale al email. */
+.login-card .p-password,
+.login-card .p-password .p-icon-field {
+  width: 100% !important;
+}
+
+.login-card .p-password .p-icon-field {
+  flex:   1 1 auto;
+  display: flex;
+}
+
+.login-card .p-password .p-inputtext,
+.login-card .p-password input {
+  flex:  1 1 auto !important;
+  width: 100% !important;
+}
+
+.login-card-footer {
+  margin-top:   26px;
+  padding-top:  18px;
+  border-top:   1px solid var(--color-border);
+  text-align:   center;
+  font-size:    0.78rem;
+  color:        var(--color-text-muted);
+}
+
+.login-error {
+  padding:        10px 12px;
+  border-radius:  var(--radius-btn);
+  background:     #FDECEA;
+  color:          #C62828;
+  font-size:      0.85rem;
+  font-weight:    500;
+}
+
+.login-submit {
+  width:      100%;
+  padding:    12px;
+  font-size:  0.95rem;
+}
+
+@media (max-width: 900px) {
+  .login-brand { display: none; }
+}
+
 
 
 

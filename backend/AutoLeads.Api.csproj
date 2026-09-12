@@ -5,10 +5,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>AutoLeads.Api</AssemblyName>
     <RootNamespace>AutoLeads</RootNamespace>
+    <RollForward>LatestMajor</RollForward>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.35" />
     <PackageReference Include="Npgsql" Version="8.0.3" />
     <PackageReference Include="ClosedXML" Version="0.102.2" />
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
   </ItemGroup>
 </Project>

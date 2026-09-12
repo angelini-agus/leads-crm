@@ -26,6 +26,16 @@ CREATE TABLE IF NOT EXISTS vendedores (
     activo BOOLEAN NOT NULL DEFAULT TRUE
 );
 
+-- Usuarios (autenticación con roles). Borrado lógico via `activo`.
+CREATE TABLE IF NOT EXISTS usuarios (
+    id            SERIAL PRIMARY KEY,
+    nombre        VARCHAR(200) NOT NULL,
+    email         VARCHAR(200) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    rol           VARCHAR(20)  NOT NULL CHECK (rol IN ('admin','asesor')),
+    activo        BOOLEAN NOT NULL DEFAULT TRUE
+);
+
 -- Index for common filter columns
 CREATE INDEX IF NOT EXISTS idx_consultas_canal          ON consultas(canal);
 CREATE INDEX IF NOT EXISTS idx_consultas_asesor         ON consultas(asesor_asignado);
@@ -70,3 +80,10 @@ VALUES
   (NOW() - INTERVAL '26 days',   'Mercado Libre','TANK 300',         'Rocío Molina',     '351-6667778',  'Córdoba',       'Laura',  'Consulta disponibilidad y tiempos de entrega'),
   (NOW() - INTERVAL '28 days',   'Llamado',      'ORA 03',           'Sebastián Cabrera','342-1231234',  'Santa Fe',      'Martín', 'Llamó por promoción de fin de mes'),
   (NOW() - INTERVAL '30 days',   'Instagram',    'JOLION H.SUPREME', 'Florencia Paz',    '341-9090909',  'Rosario',       'Marcos', 'Interesada en SUV compacta automática');
+
+-- Usuarios iniciales (password_hash generado con BCrypt).
+-- ⚠️ CAMBIAR LAS CONTRASEÑAS EN PRODUCCIÓN.
+INSERT INTO usuarios (nombre, email, password_hash, rol) VALUES
+    ('Administrador', 'admin@autoleads.com',   '$2a$11$JLWSSx5c24QLqO2zd/B7muzEzgD23JaNIbgMMoeTzeZF3qI25clc.', 'admin'),
+    ('Asesor Demo',   'asesor@autoleads.com',  '$2a$11$OSnjK4mbOTizQrGc5VssAu6VcUpZ0/L85VKez6tF1Pwy7wlsHZMNW', 'asesor')
+ON CONFLICT (email) DO NOTHING;
