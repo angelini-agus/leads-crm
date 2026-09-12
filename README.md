@@ -40,11 +40,16 @@ Mini-CRM para gestión de consultas y leads de concesionaria de vehículos.
 
 ```bash
 cd autoleads-crm
+cp .env.example .env      # local usa ASPNETCORE_ENVIRONMENT=Development
 docker compose up -d
 ```
 
 El API queda disponible en `http://localhost:5000`.  
 La BD queda disponible en `localhost:5433` (el compose mapea `5433:5432`).
+
+> El `.env.example` trae `ASPNETCORE_ENVIRONMENT=Development`, así que en local
+> la API no exige `API_KEY` y usa orígenes CORS de desarrollo. Para producción
+> cambiá a `Production` y completá `API_KEY` y `ALLOWED_ORIGINS`.
 
 > Al primer arranque, PostgreSQL crea las tablas e inserta 10 modelos, 6 vendedores y 25 consultas de seed.
 
@@ -98,11 +103,18 @@ correcta responden `401`. `/health` no requiere auth (lo usa el healthcheck).
 
 - Si `API_KEY` **no** está seteada: en `Development` la API no valida; en
   `Production` responde `503` (fail-closed).
+- Si `ALLOWED_ORIGINS` **no** está seteada: en `Development` usa el fallback
+  local; en `Production` la API **no arranca** (fail-fast, evita quedar
+  "sana" pero bloqueando el frontend por CORS).
 - El frontend manda el header automáticamente desde `VITE_API_KEY`.
 
-> Nota: al ser una SPA, `VITE_API_KEY` queda embebida en el bundle del
-> navegador y es visible en las DevTools. Sube la barrera contra acceso casual,
-> pero no es un secreto criptográfico.
+> ⚠️ Limitación conocida: al ser una SPA, `VITE_API_KEY` queda embebida en el
+> bundle del navegador y cualquier visitante puede extraerla desde las DevTools
+> y reusarla contra la API. Esto **no es autenticación server-to-server real**;
+> solo sube la barrera contra acceso directo no autenticado. Si los datos deben
+> protegerse de usuarios que abren la app, hace falta autenticación por
+> usuario/sesión, o poner un proxy server-side (ej. una Cloudflare Pages
+> Function) que guarde la key y nunca la exponga al browser.
 
 ---
 
@@ -163,20 +175,22 @@ CREATE TABLE consultas (
 
 Checklist obligatorio antes de exponer la API:
 
-1. **Generar un `API_KEY` real** y guardarlo en el `.env` del root del VPS:
+1. **Setear `ASPNETCORE_ENVIRONMENT=Production`** en el `.env` del root del VPS
+   (el `.env.example` viene con `Development` para local). Con `Production` la
+   API es fail-closed si falta `API_KEY` y fail-fast si falta `ALLOWED_ORIGINS`.
+2. **Generar un `API_KEY` real** y guardarlo en ese `.env`:
    ```bash
    openssl rand -hex 32
    ```
-   Copiá el valor a `API_KEY=` en `.env`. No lo commitees.
-2. **Setear `ALLOWED_ORIGINS`** con el dominio real de Cloudflare Pages, ej:
+   Copiá el valor a `API_KEY=`. No lo commitees.
+3. **Setear `ALLOWED_ORIGINS`** con el dominio real de Cloudflare Pages, ej:
    ```bash
    ALLOWED_ORIGINS=https://autoleads-crm.pages.dev
    ```
    Para varios orígenes, separalos con coma (sin espacios): `https://a.com,https://b.com`.
-3. **Confirmar que `VITE_API_KEY` del frontend coincide** con el `API_KEY` del
+   Si falta en `Production`, la API **no arranca** (a propósito).
+4. **Confirmar que `VITE_API_KEY` del frontend coincide** con el `API_KEY` del
    backend. Se configura en Cloudflare Pages → Settings → Environment variables.
-4. **Confirmar que `ASPNETCORE_ENVIRONMENT=Production`**, así la API es
-   fail-closed si falta `API_KEY`.
 5. Al arrancar, revisar el log del contenedor: debe decir
    `API_KEY: configurada` y la lista de `ALLOWED_ORIGINS` correcta:
    ```bash
@@ -199,8 +213,8 @@ Checklist obligatorio antes de exponer la API:
 ### Backend — Oracle Cloud VPS (Linux)
 
 1. Clonar el repo en el VPS
-2. Crear `.env` desde `.env.example` y completar `API_KEY` y `ALLOWED_ORIGINS`
-   (ver sección **Antes de deployar**)
+2. Crear `.env` desde `.env.example` y completar `ASPNETCORE_ENVIRONMENT=Production`,
+   `API_KEY` y `ALLOWED_ORIGINS` (ver sección **Antes de deployar**)
 3. Iniciar servicios:
    ```bash
    docker compose up -d

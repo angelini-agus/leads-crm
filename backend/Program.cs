@@ -15,12 +15,28 @@ var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
 var apiKey = Environment.GetEnvironmentVariable("API_KEY");
 var apiKeyConfigured = !string.IsNullOrWhiteSpace(apiKey);
 
-// ── CORS allowed origins (comma-separated env var, dev fallback) ──────────────
+// ── CORS allowed origins (comma-separated env var) ────────────────────────────
+// Development falls back to the local dev origins. Production requires an
+// explicit value and fails fast: a silent localhost fallback would let a
+// deployment start "healthy" while blocking the real frontend at CORS.
 var allowedOriginsEnv = Environment.GetEnvironmentVariable("ALLOWED_ORIGINS");
-var allowedOrigins = string.IsNullOrWhiteSpace(allowedOriginsEnv)
-    ? new[] { "http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173" }
-    : allowedOriginsEnv
+string[] allowedOrigins;
+
+if (!string.IsNullOrWhiteSpace(allowedOriginsEnv))
+{
+    allowedOrigins = allowedOriginsEnv
         .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+}
+else if (builder.Environment.IsDevelopment())
+{
+    allowedOrigins = new[] { "http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173" };
+}
+else
+{
+    throw new InvalidOperationException(
+        "ALLOWED_ORIGINS no está configurada. Es obligatoria fuera de Development " +
+        "(orígenes separados por coma, ej: https://autoleads-crm.pages.dev).");
+}
 
 // ── Dependency Injection ──────────────────────────────────────────────────────
 builder.Services.AddSingleton<IConsultaRepository>(_ => new ConsultaRepository(connectionString));
