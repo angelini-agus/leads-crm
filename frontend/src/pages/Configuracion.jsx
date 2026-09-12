@@ -3,22 +3,34 @@ import { DataTable }  from 'primereact/datatable'
 import { Column }     from 'primereact/column'
 import { Dialog }     from 'primereact/dialog'
 import { InputText }  from 'primereact/inputtext'
+import { Dropdown }   from 'primereact/dropdown'
+import { Password }   from 'primereact/password'
 import { Toast }      from 'primereact/toast'
 import { useModelos, useVendedores } from '../hooks/useMasterData'
+import { useUsuarios } from '../hooks/useUsuarios'
+
+const ROLES = [
+  { label: 'Administrador', value: 'admin' },
+  { label: 'Asesor', value: 'asesor' },
+]
 
 export default function Configuracion() {
   const { modelos, loading: loadingModelos, crearModelo, actualizarModelo, alternarEstadoModelo } = useModelos()
   const { vendedores, loading: loadingVendedores, crearVendedor, actualizarVendedor, alternarEstadoVendedor } = useVendedores()
+  const { usuarios, loading: loadingUsuarios, crearUsuario, actualizarUsuario, cambiarPassword, alternarEstadoUsuario } = useUsuarios()
 
   const toast = useRef(null)
 
   // Dialog State
   const [modelDialog, setModelDialog] = useState(false)
   const [vendorDialog, setVendorDialog] = useState(false)
+  const [usuarioDialog, setUsuarioDialog] = useState(false)
 
   const [currentModel, setCurrentModel] = useState({ id: null, nombre: '', activo: true })
   const [currentVendor, setCurrentVendor] = useState({ id: null, nombre: '', activo: true })
+  const [currentUsuario, setCurrentUsuario] = useState({ id: null, nombre: '', email: '', rol: 'asesor', activo: true, password: '' })
   const [saving, setSaving] = useState(false)
+  const [savingUsuario, setSavingUsuario] = useState(false)
 
   // Handlers for Modelos
   const openNewModel = () => {
@@ -110,6 +122,68 @@ export default function Configuracion() {
     }
   }
 
+  // Handlers for Usuarios
+  const openNewUsuario = () => {
+    setCurrentUsuario({ id: null, nombre: '', email: '', rol: 'asesor', activo: true, password: '' })
+    setUsuarioDialog(true)
+  }
+  const openEditUsuario = (u) => {
+    setCurrentUsuario({ id: u.id, nombre: u.nombre, email: u.email, rol: u.rol, activo: u.activo, password: '' })
+    setUsuarioDialog(true)
+  }
+  const saveUsuario = async () => {
+    if (!currentUsuario.nombre.trim() || !currentUsuario.email.trim()) {
+      toast.current.show({ severity: 'warn', summary: 'Campo requerido', detail: 'Ingresá nombre y email.', life: 3000 })
+      return
+    }
+    if (!currentUsuario.id && !currentUsuario.password) {
+      toast.current.show({ severity: 'warn', summary: 'Campo requerido', detail: 'Ingresá una contraseña.', life: 3000 })
+      return
+    }
+    setSavingUsuario(true)
+    try {
+      if (currentUsuario.id) {
+        await actualizarUsuario(currentUsuario.id, {
+          nombre: currentUsuario.nombre.trim(),
+          email: currentUsuario.email.trim(),
+          rol: currentUsuario.rol,
+          activo: currentUsuario.activo,
+        })
+        if (currentUsuario.password) {
+          await cambiarPassword(currentUsuario.id, currentUsuario.password)
+        }
+        toast.current.show({ severity: 'success', summary: 'Usuario actualizado', detail: `El usuario "${currentUsuario.nombre}" fue modificado.`, life: 3000 })
+      } else {
+        await crearUsuario({
+          nombre: currentUsuario.nombre.trim(),
+          email: currentUsuario.email.trim(),
+          rol: currentUsuario.rol,
+          password: currentUsuario.password,
+        })
+        toast.current.show({ severity: 'success', summary: 'Usuario creado', detail: `Se creó el usuario "${currentUsuario.nombre}".`, life: 3000 })
+      }
+      setUsuarioDialog(false)
+    } catch (err) {
+      const msg = err.response?.data?.error || 'No se pudo guardar el usuario.'
+      toast.current.show({ severity: 'error', summary: 'Error', detail: msg, life: 4000 })
+    } finally {
+      setSavingUsuario(false)
+    }
+  }
+  const handleToggleUsuario = async (u) => {
+    try {
+      await alternarEstadoUsuario(u)
+      toast.current.show({
+        severity: 'info',
+        summary: u.activo ? 'Usuario desactivado' : 'Usuario activado',
+        detail: `El usuario "${u.nombre}" fue ${u.activo ? 'desactivado' : 'activado'}.`,
+        life: 3000
+      })
+    } catch {
+      toast.current.show({ severity: 'error', summary: 'Error', detail: 'No se pudo cambiar el estado del usuario.', life: 4000 })
+    }
+  }
+
   // Cell Renderers
   const statusBodyTemplate = (rowData) => {
     return (
@@ -186,6 +260,55 @@ export default function Configuracion() {
     )
   }
 
+  const rolBodyTemplate = (rowData) => {
+    const esAdmin = rowData.rol === 'admin'
+    return (
+      <span
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '4px 10px',
+          borderRadius: '12px',
+          fontSize: '0.78rem',
+          fontWeight: 600,
+          background: esAdmin ? '#FFEBEE' : '#E3F2FD',
+          color: esAdmin ? '#C62828' : '#1565C0'
+        }}
+      >
+        <i className={esAdmin ? 'pi pi-shield' : 'pi pi-user'} />
+        {esAdmin ? 'Administrador' : 'Asesor'}
+      </span>
+    )
+  }
+
+  const usuarioActionTemplate = (rowData) => {
+    return (
+      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+        <button
+          className="btn-secondary"
+          onClick={() => openEditUsuario(rowData)}
+          type="button"
+          style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+          title="Editar usuario"
+        >
+          <i className="pi pi-pencil" />
+          Editar
+        </button>
+        <button
+          className={rowData.activo ? "btn-secondary" : "btn-primary"}
+          onClick={() => handleToggleUsuario(rowData)}
+          type="button"
+          style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+          title={rowData.activo ? "Desactivar usuario" : "Reactivar usuario"}
+        >
+          <i className={rowData.activo ? "pi pi-lock" : "pi pi-unlock"} />
+          {rowData.activo ? 'Desactivar' : 'Activar'}
+        </button>
+      </div>
+    )
+  }
+
   return (
     <>
       <Toast ref={toast} position="top-right" />
@@ -251,6 +374,44 @@ export default function Configuracion() {
 
       </div>
 
+      {/* Card 3: Gestión de Usuarios (ancho completo) */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden', marginTop: '24px' }}>
+        <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span className="section-icon" style={{ background: '#E3F2FD', color: '#1565C0' }}>
+              <i className="pi pi-id-card" />
+            </span>
+            <div>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0 }}>Usuarios</h3>
+              <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>{usuarios.length} usuarios registrados</span>
+            </div>
+          </div>
+          <button className="btn-primary" onClick={openNewUsuario} type="button" style={{ padding: '8px 14px', fontSize: '0.85rem' }}>
+            <i className="pi pi-plus" />
+            Nuevo Usuario
+          </button>
+        </div>
+
+        <DataTable value={usuarios} loading={loadingUsuarios} paginator rows={6} tableStyle={{ width: '100%', tableLayout: 'fixed' }}>
+          <Column
+            field="nombre"
+            header="Nombre"
+            sortable
+            style={{ width: '22%' }}
+            body={rowData => <span style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 600 }}>{rowData.nombre}</span>}
+          />
+          <Column
+            field="email"
+            header="Email"
+            style={{ width: '28%' }}
+            body={rowData => <span style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{rowData.email}</span>}
+          />
+          <Column field="rol" header="Rol" body={rolBodyTemplate} style={{ width: '16%' }} />
+          <Column field="activo" header="Estado" body={statusBodyTemplate} style={{ width: '14%' }} />
+          <Column body={usuarioActionTemplate} style={{ width: '20%', textAlign: 'right' }} />
+        </DataTable>
+      </div>
+
       {/* Modal Dialog: Crear/Editar Modelo */}
       <Dialog
         visible={modelDialog}
@@ -312,6 +473,72 @@ export default function Configuracion() {
             <button className="btn-primary" onClick={saveVendor} disabled={saving} type="button">
               <i className={saving ? 'pi pi-spin pi-spinner' : 'pi pi-check'} />
               {saving ? 'Guardando...' : 'Guardar Vendedor'}
+            </button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Modal Dialog: Crear/Editar Usuario */}
+      <Dialog
+        visible={usuarioDialog}
+        style={{ width: '420px' }}
+        header={currentUsuario.id ? "Editar Usuario" : "Nuevo Usuario"}
+        modal
+        className="p-fluid"
+        onHide={() => setUsuarioDialog(false)}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div className="nc-field">
+            <label className="field-label field-required" htmlFor="usuarioNombre">Nombre</label>
+            <InputText
+              id="usuarioNombre"
+              value={currentUsuario.nombre}
+              onChange={e => setCurrentUsuario(prev => ({ ...prev, nombre: e.target.value }))}
+              placeholder="Ej. Laura Pérez"
+              autoFocus
+            />
+          </div>
+          <div className="nc-field">
+            <label className="field-label field-required" htmlFor="usuarioEmail">Email</label>
+            <InputText
+              id="usuarioEmail"
+              value={currentUsuario.email}
+              onChange={e => setCurrentUsuario(prev => ({ ...prev, email: e.target.value }))}
+              placeholder="ej. laura@autoleads.com"
+              type="email"
+            />
+          </div>
+          <div className="nc-field">
+            <label className="field-label field-required" htmlFor="usuarioRol">Rol</label>
+            <Dropdown
+              inputId="usuarioRol"
+              value={currentUsuario.rol}
+              options={ROLES}
+              onChange={e => setCurrentUsuario(prev => ({ ...prev, rol: e.value }))}
+              placeholder="Seleccioná un rol"
+            />
+          </div>
+          <div className="nc-field">
+            <label className={`field-label${currentUsuario.id ? '' : ' field-required'}`} htmlFor="usuarioPassword">
+              Contraseña
+            </label>
+            <Password
+              inputId="usuarioPassword"
+              value={currentUsuario.password}
+              onChange={e => setCurrentUsuario(prev => ({ ...prev, password: e.target.value }))}
+              placeholder={currentUsuario.id ? 'Dejar vacío para no cambiar' : '••••••••'}
+              feedback={false}
+              toggleMask
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="dialog-actions">
+            <button className="btn-secondary" onClick={() => setUsuarioDialog(false)} type="button">
+              Cancelar
+            </button>
+            <button className="btn-primary" onClick={saveUsuario} disabled={savingUsuario} type="button">
+              <i className={savingUsuario ? 'pi pi-spin pi-spinner' : 'pi pi-check'} />
+              {savingUsuario ? 'Guardando...' : 'Guardar Usuario'}
             </button>
           </div>
         </div>

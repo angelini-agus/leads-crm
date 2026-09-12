@@ -2,11 +2,13 @@ import { useState, Suspense, lazy } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
+import { useAuth } from './context/AuthContext'
 
 // Lazy load pages for faster initial load
 const NuevaConsulta = lazy(() => import('./pages/NuevaConsulta'))
 const BaseDeDatos   = lazy(() => import('./pages/BaseDeDatos'))
 const Configuracion = lazy(() => import('./pages/Configuracion'))
+const Login         = lazy(() => import('./pages/Login'))
 
 function PageLoader() {
   return (
@@ -18,6 +20,21 @@ function PageLoader() {
       Cargando...
     </div>
   )
+}
+
+// Redirige a /login si no hay token (o mientras se restaura la sesión).
+function RequireAuth({ children }) {
+  const { token, loading } = useAuth()
+  if (loading) return <PageLoader />
+  if (!token) return <Navigate to="/login" replace />
+  return children
+}
+
+// Redirige a /nueva-consulta si el rol no es admin.
+function RequireAdmin({ children }) {
+  const { user } = useAuth()
+  if (user?.rol !== 'admin') return <Navigate to="/nueva-consulta" replace />
+  return children
 }
 
 function Layout() {
@@ -48,7 +65,7 @@ function Layout() {
               <Route path="/"               element={<Navigate to="/nueva-consulta" replace />} />
               <Route path="/nueva-consulta" element={<NuevaConsulta />} />
               <Route path="/base-de-datos"  element={<BaseDeDatos />} />
-              <Route path="/configuracion"  element={<Configuracion />} />
+              <Route path="/configuracion"  element={<RequireAdmin><Configuracion /></RequireAdmin>} />
               <Route path="*"               element={<Navigate to="/nueva-consulta" replace />} />
             </Routes>
           </Suspense>
@@ -59,5 +76,10 @@ function Layout() {
 }
 
 export default function App() {
-  return <Layout />
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="*" element={<RequireAuth><Layout /></RequireAuth>} />
+    </Routes>
+  )
 }

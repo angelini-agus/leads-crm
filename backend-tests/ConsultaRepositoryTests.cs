@@ -1,5 +1,7 @@
 using AutoLeads.Data;
 using AutoLeads.Models;
+using Dapper;
+using Npgsql;
 using Xunit;
 
 namespace AutoLeads.Tests;
@@ -8,14 +10,24 @@ namespace AutoLeads.Tests;
 /// Integration tests for ConsultaRepository.
 /// REQUIRES: PostgreSQL running on localhost:5432
 /// Run: docker compose up db -d  (from autoleads-crm directory)
+/// Cada test limpia las filas que inserta (telefono "000-0000") en DisposeAsync.
 /// </summary>
-public class ConsultaRepositoryTests
+public class ConsultaRepositoryTests : IAsyncLifetime
 {
     private static readonly string ConnStr =
         Environment.GetEnvironmentVariable("TEST_DATABASE_URL")
         ?? "Host=localhost;Port=5433;Database=autoleads;Username=autoleads;Password=autoleads_pass";
 
     private readonly ConsultaRepository _repo = new(ConnStr);
+
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public async Task DisposeAsync()
+    {
+        // Todas las filas creadas por estos tests usan telefono "000-0000".
+        await using var conn = new NpgsqlConnection(ConnStr);
+        await conn.ExecuteAsync("DELETE FROM consultas WHERE telefono = '000-0000';");
+    }
 
     private static Consulta BuildConsulta(string suffix = "") => new()
     {

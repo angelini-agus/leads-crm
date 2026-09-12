@@ -1,8 +1,10 @@
-using System.Security.Cryptography;
+using System.Text;
 using AutoLeads.Data;
 using AutoLeads.Models;
 using AutoLeads.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,9 +13,13 @@ var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
     ?? builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Host=localhost;Port=5433;Database=autoleads;Username=autoleads;Password=autoleads_pass";
 
-// ── API Key for server-to-server auth (required on every /api/* request) ──────
-var apiKey = Environment.GetEnvironmentVariable("API_KEY");
-var apiKeyConfigured = !string.IsNullOrWhiteSpace(apiKey);
+// ── JWT signing key (required — never hardcoded) ──────────────────────────────
+var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET");
+if (string.IsNullOrWhiteSpace(jwtSecret))
+{
+    throw new InvalidOperationException(
+        "JWT_SECRET no está configurada. Es obligatoria (usá por ejemplo: openssl rand -hex 32).");
+}
 
 // ── CORS allowed origins (comma-separated env var) ────────────────────────────
 // Development falls back to the local dev origins. Production requires an
@@ -41,7 +47,9 @@ else
 // ── Dependency Injection ──────────────────────────────────────────────────────
 builder.Services.AddSingleton<IConsultaRepository>(_ => new ConsultaRepository(connectionString));
 builder.Services.AddSingleton<IMasterDataRepository>(_ => new MasterDataRepository(connectionString));
+builder.Services.AddSingleton<IUsuarioRepository>(_ => new UsuarioRepository(connectionString));
 builder.Services.AddSingleton<ExcelService>();
+builder.Services.AddSingleton(new JwtService(jwtSecret));
 
 // ── CORS Configuration ────────────────────────────────────────────────────────
 builder.Services.AddCors(options =>
@@ -52,10 +60,42 @@ builder.Services.AddCors(options =>
             .WithOrigins(allowedOrigins)
             .SetIsOriginAllowedToAllowWildcardSubdomains()
             .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-            .WithHeaders("Content-Type", "Authorization", "Accept", "X-Api-Key")
+            .WithHeaders("Content-Type", "Authorization", "Accept")
             .WithExposedHeaders("Content-Disposition")
             .AllowCredentials();
     });
+});
+
+// ── Authentication: JWT Bearer ────────────────────────────────────────────────
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnChallenge = async context =>
+            {
+                context.HandleResponse();
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                context.Response.ContentType = "application/json";
+                await context.Response.WriteAsJsonAsync(new { error = "No autorizado. Token ausente o inválido." });
+            }
+        };
+    });
+
+// ── Authorization: rol "admin" ────────────────────────────────────────────────
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("Admin", policy => policy.RequireRole("admin"));
 });
 
 var app = builder.Build();
@@ -82,63 +122,38 @@ app.UseExceptionHandler(exceptionHandlerApp =>
 });
 
 app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
 
-// ── Startup configuration log (never prints the key value) ────────────────────
+// ── Startup configuration log (never prints the secret) ───────────────────────
 app.Logger.LogInformation(
-    "Configuración de arranque — API_KEY: {ApiKeyState}; ALLOWED_ORIGINS: {AllowedOrigins}",
-    apiKeyConfigured ? "configurada" : "AUSENTE",
+    "Configuración de arranque — JWT_SECRET: configurada; ALLOWED_ORIGINS: {AllowedOrigins}",
     string.Join(", ", allowedOrigins));
-
-if (!apiKeyConfigured)
-{
-    app.Logger.LogWarning(
-        "API_KEY no configurada. Autenticación deshabilitada en Development; en Production se rechazan las requests a /api/* con 503.");
-}
-
-// ── API Key middleware — /health is public, every /api/* request needs the key ─
-app.Use(async (context, next) =>
-{
-    if (!context.Request.Path.StartsWithSegments("/api"))
-    {
-        await next();
-        return;
-    }
-
-    if (!apiKeyConfigured)
-    {
-        if (app.Environment.IsProduction())
-        {
-            app.Logger.LogError(
-                "API_KEY ausente en Production: rechazando {Method} {Path}.",
-                context.Request.Method, context.Request.Path);
-            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-            context.Response.ContentType = "application/json";
-            await context.Response.WriteAsJsonAsync(new { error = "Servicio no configurado: falta API_KEY." });
-            return;
-        }
-
-        await next();
-        return;
-    }
-
-    var providedKey = context.Request.Headers["X-Api-Key"].ToString();
-    if (string.IsNullOrEmpty(providedKey) || !ApiKeyMatches(providedKey, apiKey!))
-    {
-        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-        context.Response.ContentType = "application/json";
-        await context.Response.WriteAsJsonAsync(new { error = "API Key inválida o ausente." });
-        return;
-    }
-
-    await next();
-});
 
 // ── Health check (public, used by Docker/nginx) ───────────────────────────────
 app.MapGet("/health", () =>
     Results.Ok(new { status = "ok", timestamp = DateTime.UtcNow }));
 
+// ── POST /api/auth/login (public) ─────────────────────────────────────────────
+app.MapPost("/api/auth/login", async (IUsuarioRepository usuarios, JwtService jwt, LoginRequest req) =>
+{
+    if (string.IsNullOrWhiteSpace(req.Email) || string.IsNullOrWhiteSpace(req.Password))
+        return Results.BadRequest(new { error = "Email y contraseña son requeridos." });
+
+    var usuario = await usuarios.ObtenerPorEmailAsync(req.Email);
+
+    if (usuario is null || !BCrypt.Net.BCrypt.Verify(req.Password, usuario.PasswordHash))
+        return Results.Unauthorized();
+
+    var token = jwt.GenerarToken(usuario);
+    return Results.Ok(new { token, nombre = usuario.Nombre, rol = usuario.Rol });
+});
+
+// ── All /api/* endpoints require a valid JWT ──────────────────────────────────
+var api = app.MapGroup("/api").RequireAuthorization();
+
 // ── GET /api/catalogos — Dynamic Dropdown Options from DB ─────────────────────
-app.MapGet("/api/catalogos", async (IMasterDataRepository masterRepo) =>
+api.MapGet("/catalogos", async (IMasterDataRepository masterRepo) =>
 {
     var modelosActivos = await masterRepo.ListarModelosAsync(soloActivos: true);
     var vendedoresActivos = await masterRepo.ListarVendedoresAsync(soloActivos: true);
@@ -161,13 +176,13 @@ app.MapGet("/api/catalogos", async (IMasterDataRepository masterRepo) =>
 });
 
 // ── Master Data: Modelos CRUD ────────────────────────────────────────────────
-app.MapGet("/api/modelos", async (IMasterDataRepository masterRepo, bool? soloActivos) =>
+api.MapGet("/modelos", async (IMasterDataRepository masterRepo, bool? soloActivos) =>
 {
     var list = await masterRepo.ListarModelosAsync(soloActivos ?? false);
     return Results.Ok(list);
 });
 
-app.MapPost("/api/modelos", async (IMasterDataRepository masterRepo, CreateMasterDataItemRequest req) =>
+api.MapPost("/modelos", async (IMasterDataRepository masterRepo, CreateMasterDataItemRequest req) =>
 {
     if (string.IsNullOrWhiteSpace(req.Nombre))
         return Results.BadRequest(new { error = "El nombre del modelo es requerido." });
@@ -181,9 +196,9 @@ app.MapPost("/api/modelos", async (IMasterDataRepository masterRepo, CreateMaste
     {
         return Results.BadRequest(new { error = "No se pudo crear el modelo. Es posible que ya exista.", detail = ex.Message });
     }
-});
+}).RequireAuthorization("Admin");
 
-app.MapPut("/api/modelos/{id:int}", async (IMasterDataRepository masterRepo, int id, UpdateMasterDataItemRequest req) =>
+api.MapPut("/modelos/{id:int}", async (IMasterDataRepository masterRepo, int id, UpdateMasterDataItemRequest req) =>
 {
     if (string.IsNullOrWhiteSpace(req.Nombre))
         return Results.BadRequest(new { error = "El nombre del modelo es requerido." });
@@ -191,23 +206,23 @@ app.MapPut("/api/modelos/{id:int}", async (IMasterDataRepository masterRepo, int
     var updated = await masterRepo.ActualizarModeloAsync(id, req.Nombre, req.Activo);
     if (!updated) return Results.NotFound(new { error = "Modelo no encontrado." });
     return Results.Ok(new { id, nombre = req.Nombre, activo = req.Activo });
-});
+}).RequireAuthorization("Admin");
 
-app.MapDelete("/api/modelos/{id:int}", async (IMasterDataRepository masterRepo, int id) =>
+api.MapDelete("/modelos/{id:int}", async (IMasterDataRepository masterRepo, int id) =>
 {
     var updated = await masterRepo.AlternarEstadoModeloAsync(id, activo: false);
     if (!updated) return Results.NotFound(new { error = "Modelo no encontrado." });
     return Results.Ok(new { message = "Modelo desactivado (borrado lógico) correctamente." });
-});
+}).RequireAuthorization("Admin");
 
 // ── Master Data: Vendedores CRUD ─────────────────────────────────────────────
-app.MapGet("/api/vendedores", async (IMasterDataRepository masterRepo, bool? soloActivos) =>
+api.MapGet("/vendedores", async (IMasterDataRepository masterRepo, bool? soloActivos) =>
 {
     var list = await masterRepo.ListarVendedoresAsync(soloActivos ?? false);
     return Results.Ok(list);
 });
 
-app.MapPost("/api/vendedores", async (IMasterDataRepository masterRepo, CreateMasterDataItemRequest req) =>
+api.MapPost("/vendedores", async (IMasterDataRepository masterRepo, CreateMasterDataItemRequest req) =>
 {
     if (string.IsNullOrWhiteSpace(req.Nombre))
         return Results.BadRequest(new { error = "El nombre del vendedor es requerido." });
@@ -221,9 +236,9 @@ app.MapPost("/api/vendedores", async (IMasterDataRepository masterRepo, CreateMa
     {
         return Results.BadRequest(new { error = "No se pudo crear el vendedor. Es posible que ya exista.", detail = ex.Message });
     }
-});
+}).RequireAuthorization("Admin");
 
-app.MapPut("/api/vendedores/{id:int}", async (IMasterDataRepository masterRepo, int id, UpdateMasterDataItemRequest req) =>
+api.MapPut("/vendedores/{id:int}", async (IMasterDataRepository masterRepo, int id, UpdateMasterDataItemRequest req) =>
 {
     if (string.IsNullOrWhiteSpace(req.Nombre))
         return Results.BadRequest(new { error = "El nombre del vendedor es requerido." });
@@ -231,17 +246,96 @@ app.MapPut("/api/vendedores/{id:int}", async (IMasterDataRepository masterRepo, 
     var updated = await masterRepo.ActualizarVendedorAsync(id, req.Nombre, req.Activo);
     if (!updated) return Results.NotFound(new { error = "Vendedor no encontrado." });
     return Results.Ok(new { id, nombre = req.Nombre, activo = req.Activo });
-});
+}).RequireAuthorization("Admin");
 
-app.MapDelete("/api/vendedores/{id:int}", async (IMasterDataRepository masterRepo, int id) =>
+api.MapDelete("/vendedores/{id:int}", async (IMasterDataRepository masterRepo, int id) =>
 {
     var updated = await masterRepo.AlternarEstadoVendedorAsync(id, activo: false);
     if (!updated) return Results.NotFound(new { error = "Vendedor no encontrado." });
     return Results.Ok(new { message = "Vendedor desactivado (borrado lógico) correctamente." });
-});
+}).RequireAuthorization("Admin");
+
+// ── Usuarios CRUD (admin only) ────────────────────────────────────────────────
+api.MapGet("/usuarios", async (IUsuarioRepository repo) =>
+{
+    var list = await repo.ListarAsync();
+    return Results.Ok(list);
+}).RequireAuthorization("Admin");
+
+api.MapPost("/usuarios", async (IUsuarioRepository repo, CreateUsuarioRequest req) =>
+{
+    if (string.IsNullOrWhiteSpace(req.Nombre) ||
+        string.IsNullOrWhiteSpace(req.Email)  ||
+        string.IsNullOrWhiteSpace(req.Password))
+    {
+        return Results.BadRequest(new { error = "Nombre, email y contraseña son requeridos." });
+    }
+
+    if (req.Rol is not ("admin" or "asesor"))
+        return Results.BadRequest(new { error = "El rol debe ser 'admin' o 'asesor'." });
+
+    try
+    {
+        var usuario = new Usuario
+        {
+            Nombre       = req.Nombre.Trim(),
+            Email        = req.Email.Trim(),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.Password),
+            Rol          = req.Rol,
+            Activo       = true
+        };
+
+        var id = await repo.CrearAsync(usuario);
+        return Results.Created($"/api/usuarios/{id}",
+            new { id, nombre = usuario.Nombre, email = usuario.Email, rol = usuario.Rol, activo = true });
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = "No se pudo crear el usuario. Es posible que el email ya exista.", detail = ex.Message });
+    }
+}).RequireAuthorization("Admin");
+
+api.MapPut("/usuarios/{id:int}", async (IUsuarioRepository repo, int id, UpdateUsuarioRequest req) =>
+{
+    if (string.IsNullOrWhiteSpace(req.Nombre) || string.IsNullOrWhiteSpace(req.Email))
+        return Results.BadRequest(new { error = "Nombre y email son requeridos." });
+
+    if (req.Rol is not ("admin" or "asesor"))
+        return Results.BadRequest(new { error = "El rol debe ser 'admin' o 'asesor'." });
+
+    try
+    {
+        var updated = await repo.ActualizarAsync(id, req.Nombre.Trim(), req.Email.Trim(), req.Rol, req.Activo);
+        if (!updated) return Results.NotFound(new { error = "Usuario no encontrado." });
+        return Results.Ok(new { id, nombre = req.Nombre.Trim(), email = req.Email.Trim(), rol = req.Rol, activo = req.Activo });
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = "No se pudo actualizar el usuario. Es posible que el email ya exista.", detail = ex.Message });
+    }
+}).RequireAuthorization("Admin");
+
+api.MapPut("/usuarios/{id:int}/password", async (IUsuarioRepository repo, int id, UpdatePasswordRequest req) =>
+{
+    if (string.IsNullOrWhiteSpace(req.Password))
+        return Results.BadRequest(new { error = "La contraseña es requerida." });
+
+    var hash    = BCrypt.Net.BCrypt.HashPassword(req.Password);
+    var updated = await repo.ActualizarPasswordAsync(id, hash);
+
+    if (!updated) return Results.NotFound(new { error = "Usuario no encontrado." });
+    return Results.Ok(new { message = "Contraseña actualizada correctamente." });
+}).RequireAuthorization("Admin");
+
+api.MapDelete("/usuarios/{id:int}", async (IUsuarioRepository repo, int id) =>
+{
+    var updated = await repo.AlternarEstadoAsync(id, activo: false);
+    if (!updated) return Results.NotFound(new { error = "Usuario no encontrado." });
+    return Results.Ok(new { message = "Usuario desactivado (borrado lógico) correctamente." });
+}).RequireAuthorization("Admin");
 
 // ── GET /api/consultas — List with optional filters ───────────────────────────
-app.MapGet("/api/consultas", async (
+api.MapGet("/consultas", async (
     IConsultaRepository repo,
     string?             canal,
     string?             asesorAsignado,
@@ -272,7 +366,7 @@ app.MapGet("/api/consultas", async (
 });
 
 // ── POST /api/consultas — Create a new lead ───────────────────────────────────
-app.MapPost("/api/consultas", async (IConsultaRepository repo, CreateConsultaRequest req) =>
+api.MapPost("/consultas", async (IConsultaRepository repo, CreateConsultaRequest req) =>
 {
     if (string.IsNullOrWhiteSpace(req.Canal)   ||
         string.IsNullOrWhiteSpace(req.Modelo)  ||
@@ -317,7 +411,7 @@ app.MapPost("/api/consultas", async (IConsultaRepository repo, CreateConsultaReq
 });
 
 // ── GET /api/consultas/export — Download Excel with current filters ────────────
-app.MapGet("/api/consultas/export", async (
+api.MapGet("/consultas/export", async (
     IConsultaRepository repo,
     ExcelService         excel,
     string?              canal,
@@ -355,14 +449,35 @@ app.MapGet("/api/consultas/export", async (
     }
 });
 
-app.Run();
-
-// Constant-time comparison to avoid leaking the key length/content via timing.
-static bool ApiKeyMatches(string provided, string expected)
+// ── GET /api/metricas — aggregate counts (admin only) ─────────────────────────
+api.MapGet("/metricas", async (IConsultaRepository repo) =>
 {
-    var providedBytes = System.Text.Encoding.UTF8.GetBytes(provided);
-    var expectedBytes = System.Text.Encoding.UTF8.GetBytes(expected);
-    return CryptographicOperations.FixedTimeEquals(providedBytes, expectedBytes);
-}
+    try
+    {
+        var data = (await repo.ListarAsync(new ConsultaFiltros())).ToList();
+        var total = data.Count;
+        var ultimos30 = data.Count(c => c.Fecha >= DateTimeOffset.UtcNow.AddDays(-30));
+        var porCanal = data.GroupBy(c => c.Canal).ToDictionary(g => g.Key, g => g.Count());
+        var porAsesor = data.GroupBy(c => c.AsesorAsignado).ToDictionary(g => g.Key, g => g.Count());
+
+        return Results.Ok(new
+        {
+            totalConsultas = total,
+            consultasUltimos30Dias = ultimos30,
+            porCanal,
+            porAsesor
+        });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            detail: ex.Message,
+            title: "Error al generar las métricas.",
+            statusCode: StatusCodes.Status500InternalServerError
+        );
+    }
+}).RequireAuthorization("Admin");
+
+app.Run();
 
 public partial class Program { }

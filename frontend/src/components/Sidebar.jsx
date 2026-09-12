@@ -1,8 +1,10 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 const NAV_GROUPS = [
   {
     section: 'GESTIÓN DIARIA',
+    adminOnly: false,
     items: [
       {
         to:    '/nueva-consulta',
@@ -18,6 +20,7 @@ const NAV_GROUPS = [
   },
   {
     section: 'ADMINISTRACIÓN',
+    adminOnly: true,
     items: [
       {
         to:    '/configuracion',
@@ -65,6 +68,30 @@ function NavItem({ item, collapsed }) {
 }
 
 export default function Sidebar({ collapsed, onToggle }) {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+
+  const rol = user?.rol
+  const isAdmin = rol === 'admin'
+  const rolLabel = isAdmin ? 'Administrador' : 'Asesor'
+
+  // Iniciales para el avatar (primeras letras del nombre).
+  const initials = (user?.nombre ?? '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(p => p[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || '??'
+
+  // Los asesores no ven el grupo ADMINISTRACIÓN.
+  const groups = NAV_GROUPS.filter(g => !g.adminOnly || isAdmin)
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login', { replace: true })
+  }
+
   return (
     <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
       {/* ── Logo + Toggle Button ── */}
@@ -90,7 +117,7 @@ export default function Sidebar({ collapsed, onToggle }) {
 
       {/* ── Navigation ── */}
       <nav className="sidebar-nav">
-        {NAV_GROUPS.map(group => (
+        {groups.map(group => (
           <div key={group.section}>
             {!collapsed && <div className="sidebar-section-label">{group.section}</div>}
             {group.items.map(item => (
@@ -102,14 +129,14 @@ export default function Sidebar({ collapsed, onToggle }) {
 
       {/* ── User Footer ── */}
       <div className="sidebar-footer">
-        <div className="user-avatar" title="Sarah Johnson (Administradora)">SJ</div>
+        <div className="user-avatar" title={`${user?.nombre ?? ''} (${rolLabel})`}>{initials}</div>
         {!collapsed && (
           <>
             <div className="user-info">
-              <div className="user-name">Sarah Johnson</div>
-              <div className="user-role">Administradora</div>
+              <div className="user-name">{user?.nombre ?? 'Invitado'}</div>
+              <div className="user-role">{rolLabel}</div>
             </div>
-            <button className="btn-icon-ghost" title="Cerrar sesión" type="button">
+            <button className="btn-icon-ghost" title="Cerrar sesión" type="button" onClick={handleLogout}>
               <i className="pi pi-sign-out" style={{ fontSize: '0.9rem' }} />
             </button>
           </>
