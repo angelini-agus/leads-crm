@@ -48,6 +48,7 @@ else
 builder.Services.AddSingleton<IConsultaRepository>(_ => new ConsultaRepository(connectionString));
 builder.Services.AddSingleton<IMasterDataRepository>(_ => new MasterDataRepository(connectionString));
 builder.Services.AddSingleton<IUsuarioRepository>(_ => new UsuarioRepository(connectionString));
+builder.Services.AddSingleton<IMetricasRepository>(_ => new MetricasRepository(connectionString));
 builder.Services.AddSingleton<ExcelService>();
 builder.Services.AddSingleton(new JwtService(jwtSecret));
 
@@ -449,24 +450,19 @@ api.MapGet("/consultas/export", async (
     }
 });
 
-// ── GET /api/metricas — aggregate counts (admin only) ─────────────────────────
-api.MapGet("/metricas", async (IConsultaRepository repo) =>
+// ── GET /api/consultas/metricas — dashboard aggregates (admin only) ──────────
+api.MapGet("/consultas/metricas", async (
+    IMetricasRepository repo,
+    string?             fechaDesde,
+    string?             fechaHasta) =>
 {
     try
     {
-        var data = (await repo.ListarAsync(new ConsultaFiltros())).ToList();
-        var total = data.Count;
-        var ultimos30 = data.Count(c => c.Fecha >= DateTimeOffset.UtcNow.AddDays(-30));
-        var porCanal = data.GroupBy(c => c.Canal).ToDictionary(g => g.Key, g => g.Count());
-        var porAsesor = data.GroupBy(c => c.AsesorAsignado).ToDictionary(g => g.Key, g => g.Count());
+        var desde = DateOnly.TryParse(fechaDesde, out var fd) ? fd : (DateOnly?)null;
+        var hasta = DateOnly.TryParse(fechaHasta, out var fh) ? fh : (DateOnly?)null;
 
-        return Results.Ok(new
-        {
-            totalConsultas = total,
-            consultasUltimos30Dias = ultimos30,
-            porCanal,
-            porAsesor
-        });
+        var data = await repo.ObtenerMetricasAsync(desde, hasta);
+        return Results.Ok(data);
     }
     catch (Exception ex)
     {

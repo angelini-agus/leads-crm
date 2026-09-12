@@ -30,6 +30,9 @@ Mini-CRM para gestión de consultas y leads de concesionaria de vehículos.
 ### Configuración de datos maestros (modelos, vendedores y usuarios)
 ![Configuración](docs/screenshots/03-configuracion.png)
 
+### Métricas (KPIs y gráficos)
+![Métricas](docs/screenshots/05-metricas.png)
+
 ---
 
 ## Inicio rápido (desarrollo local)
@@ -108,7 +111,7 @@ Todos los endpoints bajo `/api/*` requieren un JWT válido en el header
 - El token expira a las **8 horas** (una jornada laboral). No hay refresh token.
 - Roles: `admin` (acceso total) y `asesor` (solo Ingresar Consulta y Base de Datos).
 - Escrituras de datos maestros (POST/PUT/DELETE de `modelos` y `vendedores`) y
-  `GET /api/metricas` exigen rol `admin`; un asesor recibe `403`.
+  `GET /api/consultas/metricas` exigen rol `admin`; un asesor recibe `403`.
 - Contraseñas hasheadas con **BCrypt** (BCrypt.Net-Next).
 
 Usuarios iniciales (seed en `backend/sql/init.sql`) — **cambiá las contraseñas en producción**:
@@ -139,7 +142,7 @@ Usuarios iniciales (seed en `backend/sql/init.sql`) — **cambiá las contraseñ
 | `POST`/`PUT`/`DELETE` | `/api/modelos` | admin | CRUD de modelos |
 | `GET`  | `/api/vendedores` | JWT | Listar vendedores |
 | `POST`/`PUT`/`DELETE` | `/api/vendedores` | admin | CRUD de vendedores |
-| `GET`  | `/api/metricas` | admin | Conteos agregados (total, últimos 30 días, por canal/asesor) |
+| `GET`  | `/api/consultas/metricas` | admin | Agregados para dashboard (total, por canal/asesor/modelo/día) |
 | `GET`  | `/api/usuarios` | admin | Listar usuarios |
 | `POST` | `/api/usuarios` | admin | Crear usuario |
 | `PUT`  | `/api/usuarios/{id}` | admin | Editar usuario (nombre, email, rol, activo) |
@@ -299,10 +302,12 @@ autoleads-crm/
 │   │   └── init.sql            # Schema + seed data
 │   ├── Models/
 │   │   ├── Consulta.cs         # Entidad + DTOs
-│   │   └── Usuario.cs          # Entidad usuario + LoginRequest
+│   │   ├── Usuario.cs          # Entidad usuario + LoginRequest
+│   │   └── Metricas.cs         # DTOs de agregación del dashboard
 │   ├── Data/
 │   │   ├── ConsultaRepository.cs   # Dapper queries con filtros dinámicos
-│   │   └── UsuarioRepository.cs    # Dapper, login de usuarios
+│   │   ├── UsuarioRepository.cs    # Dapper, login/CRUD de usuarios
+│   │   └── MetricasRepository.cs   # Dapper, agregaciones GROUP BY
 │   └── Services/
 │       ├── ExcelService.cs     # Generación Excel con ClosedXML
 │       └── JwtService.cs       # Firma de JWT (HS256, 8h)
@@ -331,9 +336,11 @@ autoleads-crm/
         │   └── TopBar.jsx      # Barra de búsqueda + notificaciones
         ├── hooks/
         │   ├── useConsultas.js # useCatalogos + useConsultas hooks
-        │   └── useUsuarios.js  # CRUD de usuarios (admin)
+        │   ├── useUsuarios.js  # CRUD de usuarios (admin)
+        │   └── useMetricas.js  # Dashboard de métricas (admin)
         └── pages/
             ├── Login.jsx          # Login (email + contraseña)
             ├── NuevaConsulta.jsx  # Formulario de carga rápida
-            └── BaseDeDatos.jsx    # DataTable + filtros + export Excel
+            ├── BaseDeDatos.jsx    # DataTable + filtros + export Excel
+            └── Metricas.jsx       # KPIs + gráficos (Chart.js)
 ```

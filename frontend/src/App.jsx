@@ -8,6 +8,7 @@ import { useAuth } from './context/AuthContext'
 const NuevaConsulta = lazy(() => import('./pages/NuevaConsulta'))
 const BaseDeDatos   = lazy(() => import('./pages/BaseDeDatos'))
 const Configuracion = lazy(() => import('./pages/Configuracion'))
+const Metricas      = lazy(() => import('./pages/Metricas'))
 const Login         = lazy(() => import('./pages/Login'))
 
 function PageLoader() {
@@ -66,6 +67,7 @@ function Layout() {
               <Route path="/nueva-consulta" element={<NuevaConsulta />} />
               <Route path="/base-de-datos"  element={<BaseDeDatos />} />
               <Route path="/configuracion"  element={<RequireAdmin><Configuracion /></RequireAdmin>} />
+              <Route path="/metricas"      element={<RequireAdmin><Metricas /></RequireAdmin>} />
               <Route path="*"               element={<Navigate to="/nueva-consulta" replace />} />
             </Routes>
           </Suspense>

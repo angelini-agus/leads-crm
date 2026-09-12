@@ -28,10 +28,9 @@ const NAV_GROUPS = [
         icon:  'pi pi-cog',
       },
       {
-        to:       null,
-        label:    'Métricas (Próximamente)',
-        icon:     'pi pi-chart-bar',
-        disabled: true,
+        to:    '/metricas',
+        label: 'Métricas',
+        icon:  'pi pi-chart-bar',
       },
     ],
   },
