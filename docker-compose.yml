@@ -26,6 +26,8 @@ services:
       DATABASE_URL: "Host=db;Port=5432;Database=autoleads;Username=autoleads;Password=autoleads_pass"
       ASPNETCORE_URLS: "http://+:5000"
       ASPNETCORE_ENVIRONMENT: Production
+      API_KEY: "${API_KEY}"
+      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS}"
     ports:
       - "5000:5000"
     depends_on:
