@@ -60,22 +60,57 @@ function formatFecha(dateStr) {
 
 function FechaBody({ fecha }) {
   return (
-    <span style={{ fontSize: '0.83rem', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+    <span style={{
+      fontSize: '0.83rem',
+      color: 'var(--color-text-secondary)',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      display: 'block',
+    }}>
       {formatFecha(fecha)}
     </span>
   )
 }
 
 function CanalBody({ canal }) {
-  return <span className={`canal-badge ${getCanalClass(canal)}`}>{canal}</span>
+  return (
+    <span
+      className={`canal-badge ${getCanalClass(canal)}`}
+      style={{ display: 'inline-block', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}
+    >
+      {canal}
+    </span>
+  )
 }
 
 function ModeloBody({ modelo }) {
-  return <strong style={{ fontSize: '0.875rem', letterSpacing: '-0.01em' }}>{modelo}</strong>
+  return (
+    <strong style={{
+      fontSize: '0.875rem',
+      letterSpacing: '-0.01em',
+      display: 'block',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+    }}>
+      {modelo}
+    </strong>
+  )
 }
 
 function ClienteBody({ nombreCliente }) {
-  return <span style={{ fontSize: '0.875rem' }}>{nombreCliente || '—'}</span>
+  return (
+    <span style={{
+      fontSize: '0.875rem',
+      display: 'block',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+    }}>
+      {nombreCliente || '—'}
+    </span>
+  )
 }
 
 function TelefonoBody({ telefono }) {
@@ -301,8 +336,7 @@ export default function BaseDeDatos() {
               No se encontraron consultas con los filtros aplicados.
             </div>
           }
-          tableStyle={{ width: '100%', minWidth: '950px' }}
-          scrollable
+          tableStyle={{ width: '100%', tableLayout: 'fixed' }}
           removableSort
         >
           <Column
@@ -310,53 +344,53 @@ export default function BaseDeDatos() {
             header="Fecha"
             sortable
             body={row => <FechaBody fecha={row.fecha} />}
-            style={{ width: '12%', minWidth: '135px' }}
+            style={{ width: '12%' }}
           />
           <Column
             field="canal"
             header="Canal"
             sortable
             body={row => <CanalBody canal={row.canal} />}
-            style={{ width: '11%', minWidth: '125px' }}
+            style={{ width: '11%' }}
           />
           <Column
             field="modelo"
             header="Modelo"
             sortable
             body={row => <ModeloBody modelo={row.modelo} />}
-            style={{ width: '14%', minWidth: '140px' }}
+            style={{ width: '14%' }}
           />
           <Column
             field="nombreCliente"
             header="Cliente"
             sortable
             body={row => <ClienteBody nombreCliente={row.nombreCliente} />}
-            style={{ width: '15%', minWidth: '150px' }}
+            style={{ width: '15%' }}
           />
           <Column
             field="telefono"
             header="Teléfono"
             body={row => <TelefonoBody telefono={row.telefono} />}
-            style={{ width: '12%', minWidth: '135px' }}
+            style={{ width: '12%' }}
           />
           <Column
             field="ciudad"
             header="Ciudad"
-            body={row => <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>{row.ciudad || '—'}</span>}
-            style={{ width: '11%', minWidth: '110px' }}
+            body={row => <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.ciudad || '—'}</span>}
+            style={{ width: '11%' }}
           />
           <Column
             field="asesorAsignado"
             header="Asesor"
             sortable
             body={row => <AsesorBody asesorAsignado={row.asesorAsignado} />}
-            style={{ width: '6%', minWidth: '70px', textAlign: 'center' }}
+            style={{ width: '6%', textAlign: 'center' }}
           />
           <Column
             field="observaciones"
             header="Observaciones"
             body={row => <ObservacionesBody observaciones={row.observaciones} />}
-            style={{ width: '19%', minWidth: '180px' }}
+            style={{ width: '19%' }}
           />
         </DataTable>
 
