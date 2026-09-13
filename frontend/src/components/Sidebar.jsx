@@ -86,8 +86,8 @@ export default function Sidebar({ collapsed, onToggle }) {
   // Los asesores no ven el grupo ADMINISTRACIÓN.
   const groups = NAV_GROUPS.filter(g => !g.adminOnly || isAdmin)
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
     navigate('/login', { replace: true })
   }
 
@@ -130,16 +130,20 @@ export default function Sidebar({ collapsed, onToggle }) {
       <div className="sidebar-footer">
         <div className="user-avatar" title={`${user?.nombre ?? ''} (${rolLabel})`}>{initials}</div>
         {!collapsed && (
-          <>
-            <div className="user-info">
-              <div className="user-name">{user?.nombre ?? 'Invitado'}</div>
-              <div className="user-role">{rolLabel}</div>
-            </div>
-            <button className="btn-icon-ghost" title="Cerrar sesión" type="button" onClick={handleLogout}>
-              <i className="pi pi-sign-out" style={{ fontSize: '0.9rem' }} />
-            </button>
-          </>
+          <div className="user-info">
+            <div className="user-name">{user?.nombre ?? 'Invitado'}</div>
+            <div className="user-role">{rolLabel}</div>
+          </div>
         )}
+        <button
+          className="btn-icon-ghost"
+          title="Cerrar sesión"
+          aria-label="Cerrar sesión"
+          type="button"
+          onClick={handleLogout}
+        >
+          <i className="pi pi-sign-out" style={{ fontSize: '0.9rem' }} />
+        </button>
       </div>
     </aside>
   )

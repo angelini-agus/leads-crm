@@ -23,11 +23,11 @@ function PageLoader() {
   )
 }
 
-// Redirige a /login si no hay token (o mientras se restaura la sesión).
+// Redirige a /login si no hay sesión (o mientras se restaura).
 function RequireAuth({ children }) {
-  const { token, loading } = useAuth()
+  const { user, loading } = useAuth()
   if (loading) return <PageLoader />
-  if (!token) return <Navigate to="/login" replace />
+  if (!user) return <Navigate to="/login" replace />
   return children
 }
 

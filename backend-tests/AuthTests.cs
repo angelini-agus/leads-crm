@@ -42,13 +42,14 @@ public class AuthTests
     }
 
     [Fact]
-    public void Seeds_ContraseñasPorDefecto_CoincidenConLosHashesDeInitSql()
+    public void AdminBootstrapper_GeneraPasswordAleatoriaYHasheable()
     {
-        // Debe mantenerse sincronizado con backend/sql/init.sql.
-        const string hashAdmin  = "$2a$11$JLWSSx5c24QLqO2zd/B7muzEzgD23JaNIbgMMoeTzeZF3qI25clc.";
-        const string hashAsesor = "$2a$11$OSnjK4mbOTizQrGc5VssAu6VcUpZ0/L85VKez6tF1Pwy7wlsHZMNW";
+        var password = AdminBootstrapper.GenerarPasswordAleatoria();
 
-        Assert.True(BCrypt.Net.BCrypt.Verify("admin123",  hashAdmin));
-        Assert.True(BCrypt.Net.BCrypt.Verify("asesor123", hashAsesor));
+        Assert.True(password.Length >= 16);
+        Assert.NotEqual(password, AdminBootstrapper.GenerarPasswordAleatoria());
+
+        var hash = BCrypt.Net.BCrypt.HashPassword(password);
+        Assert.True(BCrypt.Net.BCrypt.Verify(password, hash));
     }
 }

@@ -248,6 +248,8 @@ body {
 }
 
 .sidebar.collapsed .sidebar-footer {
+  flex-direction: column;
+  gap:            8px;
   justify-content: center;
   padding:         14px 0;
 }
@@ -685,6 +687,11 @@ body {
 
 
 /* ── DataTable footer ────────────────────────────────────── */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .table-footer {
   padding:     12px 20px;
   border-top:  1px solid var(--color-border);

@@ -7,6 +7,8 @@ namespace AutoLeads.Data;
 public interface IUsuarioRepository
 {
     Task<Usuario?> ObtenerPorEmailAsync(string email);
+    Task<Usuario?> ObtenerPorIdAsync(int id);
+    Task<int> ContarAdminsActivosAsync();
     Task<IEnumerable<UsuarioDto>> ListarAsync();
     Task<int> CrearAsync(Usuario usuario);
     Task<bool> ActualizarAsync(int id, string nombre, string email, string rol, bool activo);
@@ -42,6 +44,36 @@ public class UsuarioRepository(string connectionString) : IUsuarioRepository
         return await conn.QuerySingleOrDefaultAsync<Usuario>(sql, new { Email = email.Trim() });
     }
 
+    public async Task<Usuario?> ObtenerPorIdAsync(int id)
+    {
+        const string sql = """
+            SELECT id,
+                   nombre,
+                   email,
+                   password_hash AS PasswordHash,
+                   rol,
+                   activo
+            FROM usuarios
+            WHERE id = @Id;
+            """;
+
+        await using var conn = CreateConnection();
+        return await conn.QuerySingleOrDefaultAsync<Usuario>(sql, new { Id = id });
+    }
+
+    public async Task<int> ContarAdminsActivosAsync()
+    {
+        const string sql = """
+            SELECT COUNT(*)
+            FROM usuarios
+            WHERE rol = 'admin'
+              AND activo = TRUE;
+            """;
+
+        await using var conn = CreateConnection();
+        return await conn.ExecuteScalarAsync<int>(sql);
+    }
+
     public async Task<IEnumerable<UsuarioDto>> ListarAsync()
     {
         const string sql = """
@@ -63,7 +95,13 @@ public class UsuarioRepository(string connectionString) : IUsuarioRepository
             """;
 
         await using var conn = CreateConnection();
-        return await conn.ExecuteScalarAsync<int>(sql, usuario);
+        return await conn.ExecuteScalarAsync<int>(sql, new
+        {
+            usuario.Nombre,
+            Email        = usuario.Email.Trim().ToLowerInvariant(),
+            usuario.PasswordHash,
+            usuario.Rol
+        });
     }
 
     public async Task<bool> ActualizarAsync(int id, string nombre, string email, string rol, bool activo)
@@ -75,7 +113,7 @@ public class UsuarioRepository(string connectionString) : IUsuarioRepository
             """;
 
         await using var conn = CreateConnection();
-        var affected = await conn.ExecuteAsync(sql, new { Id = id, Nombre = nombre, Email = email, Rol = rol, Activo = activo });
+        var affected = await conn.ExecuteAsync(sql, new { Id = id, Nombre = nombre, Email = email.Trim().ToLowerInvariant(), Rol = rol, Activo = activo });
         return affected > 0;
     }
 

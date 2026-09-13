@@ -205,7 +205,7 @@ export default function Metricas() {
           Cargando métricas...
         </div>
       ) : data ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(420px, 100%), 1fr))', gap: '24px' }}>
           <div className="card" style={{ padding: '20px 22px' }}>
             <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 16px' }}>Consultas por canal</h3>
             <div style={{ height: 280 }}>

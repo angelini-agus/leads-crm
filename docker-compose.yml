@@ -28,6 +28,8 @@ services:
       ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT:-Production}"
       JWT_SECRET: "${JWT_SECRET}"
       ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-}"
+      SEED_ADMIN_EMAIL: "${SEED_ADMIN_EMAIL:-admin@autoleads.com}"
+      SEED_ADMIN_PASSWORD: "${SEED_ADMIN_PASSWORD:-}"
     ports:
       - "5000:5000"
     depends_on:
