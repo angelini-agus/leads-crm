@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { DataTable }  from 'primereact/datatable'
 import { Column }     from 'primereact/column'
 import { Dialog }     from 'primereact/dialog'
@@ -17,9 +17,21 @@ const ROLES = [
 export default function Configuracion() {
   const { modelos, loading: loadingModelos, crearModelo, actualizarModelo, alternarEstadoModelo } = useModelos()
   const { vendedores, loading: loadingVendedores, crearVendedor, actualizarVendedor, alternarEstadoVendedor } = useVendedores()
-  const { usuarios, loading: loadingUsuarios, crearUsuario, actualizarUsuario, cambiarPassword, alternarEstadoUsuario } = useUsuarios()
+  const { usuarios, loading: loadingUsuarios, error: errorUsuarios, crearUsuario, actualizarUsuario, cambiarPassword, alternarEstadoUsuario } = useUsuarios()
 
   const toast = useRef(null)
+
+  // Si falla la carga inicial de usuarios, avisar en vez de mostrar lista vacía.
+  useEffect(() => {
+    if (errorUsuarios) {
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'No se pudieron cargar los usuarios.',
+        life: 4000,
+      })
+    }
+  }, [errorUsuarios])
 
   // Dialog State
   const [modelDialog, setModelDialog] = useState(false)

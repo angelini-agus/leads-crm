@@ -5,7 +5,7 @@ import { Password } from 'primereact/password'
 import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
-  const { login, token } = useAuth()
+  const { login, user } = useAuth()
   const navigate = useNavigate()
 
   const [email, setEmail] = useState('')
@@ -14,7 +14,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
 
   // Ya logueado → a la app.
-  if (token) return <Navigate to="/nueva-consulta" replace />
+  if (user) return <Navigate to="/nueva-consulta" replace />
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -102,7 +102,7 @@ export default function Login() {
               />
             </div>
 
-            {error && <div className="login-error">{error}</div>}
+            {error && <div className="login-error" role="alert" aria-live="assertive">{error}</div>}
 
             <button
               className="btn-primary login-submit"

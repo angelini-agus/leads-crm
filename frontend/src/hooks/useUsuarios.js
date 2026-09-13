@@ -8,14 +8,23 @@ import apiClient from '../api/client'
 export function useUsuarios() {
   const [usuarios, setUsuarios] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   const cargar = useCallback(async () => {
-    const res = await apiClient.get('/api/usuarios')
-    setUsuarios(res.data)
+    try {
+      const res = await apiClient.get('/api/usuarios')
+      setUsuarios(res.data)
+      setError(null)
+    } catch (err) {
+      setError(err)
+      throw err
+    }
   }, [])
 
   useEffect(() => {
-    cargar().finally(() => setLoading(false))
+    cargar()
+      .catch(() => { /* el error queda expuesto via `error` */ })
+      .finally(() => setLoading(false))
   }, [cargar])
 
   const crearUsuario = async (payload) => {
@@ -42,5 +51,5 @@ export function useUsuarios() {
     await cargar()
   }
 
-  return { usuarios, loading, crearUsuario, actualizarUsuario, cambiarPassword, alternarEstadoUsuario }
+  return { usuarios, loading, error, crearUsuario, actualizarUsuario, cambiarPassword, alternarEstadoUsuario }
 }

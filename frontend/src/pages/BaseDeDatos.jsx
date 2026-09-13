@@ -324,6 +324,9 @@ export default function BaseDeDatos() {
 
       {/* ── DataTable Full Width ── */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        {/* En pantallas angostas la tabla no entra: scroll horizontal para no
+            recortar columnas (teléfono, asesor, observaciones). */}
+        <div className="table-scroll">
         <DataTable
           value={consultas}
           loading={loading}
@@ -336,7 +339,7 @@ export default function BaseDeDatos() {
               No se encontraron consultas con los filtros aplicados.
             </div>
           }
-          tableStyle={{ width: '100%', tableLayout: 'fixed' }}
+          tableStyle={{ minWidth: 900, width: '100%', tableLayout: 'fixed' }}
           removableSort
         >
           <Column
@@ -393,6 +396,7 @@ export default function BaseDeDatos() {
             style={{ width: '19%' }}
           />
         </DataTable>
+        </div>
 
         <div className="table-footer">
           {loading

@@ -27,14 +27,18 @@ CREATE TABLE IF NOT EXISTS vendedores (
 );
 
 -- Usuarios (autenticación con roles). Borrado lógico via `activo`.
+-- El email NO lleva UNIQUE de columna: la unicidad es case-insensitive
+-- (índice sobre lower(email)), para que User@x.com y user@x.com no coexistan.
 CREATE TABLE IF NOT EXISTS usuarios (
     id            SERIAL PRIMARY KEY,
     nombre        VARCHAR(200) NOT NULL,
-    email         VARCHAR(200) UNIQUE NOT NULL,
+    email         VARCHAR(200) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     rol           VARCHAR(20)  NOT NULL CHECK (rol IN ('admin','asesor')),
     activo        BOOLEAN NOT NULL DEFAULT TRUE
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_usuarios_email_lower ON usuarios (lower(email));
 
 -- Index for common filter columns
 CREATE INDEX IF NOT EXISTS idx_consultas_canal          ON consultas(canal);
@@ -81,9 +85,8 @@ VALUES
   (NOW() - INTERVAL '28 days',   'Llamado',      'ORA 03',           'Sebastián Cabrera','342-1231234',  'Santa Fe',      'Martín', 'Llamó por promoción de fin de mes'),
   (NOW() - INTERVAL '30 days',   'Instagram',    'JOLION H.SUPREME', 'Florencia Paz',    '341-9090909',  'Rosario',       'Marcos', 'Interesada en SUV compacta automática');
 
--- Usuarios iniciales (password_hash generado con BCrypt).
--- ⚠️ CAMBIAR LAS CONTRASEÑAS EN PRODUCCIÓN.
-INSERT INTO usuarios (nombre, email, password_hash, rol) VALUES
-    ('Administrador', 'admin@autoleads.com',   '$2a$11$JLWSSx5c24QLqO2zd/B7muzEzgD23JaNIbgMMoeTzeZF3qI25clc.', 'admin'),
-    ('Asesor Demo',   'asesor@autoleads.com',  '$2a$11$OSnjK4mbOTizQrGc5VssAu6VcUpZ0/L85VKez6tF1Pwy7wlsHZMNW', 'asesor')
-ON CONFLICT (email) DO NOTHING;
+-- Usuarios: NO se siembran cuentas con contraseñas publicadas en el repo.
+-- La API crea el primer admin al arrancar (ver AdminBootstrapper):
+--   - Usa SEED_ADMIN_EMAIL (default admin@autoleads.com).
+--   - Usa SEED_ADMIN_PASSWORD si está seteada; si no, genera una temporal
+--     aleatoria y la escribe una única vez en el log del contenedor.
